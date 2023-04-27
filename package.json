@@ -1,5 +1,5 @@
 {
-  "name": "mermaid-monorepo",
+  "name": "@xiezg/mermaid",
   "private": true,
   "version": "10.1.0",
   "description": "Markdownish syntax for generating flowcharts, sequence diagrams, class diagrams, gantt charts and git graphs.",
