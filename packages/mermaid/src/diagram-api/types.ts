@@ -20,6 +20,7 @@ export interface DiagramDb {
   getAccTitle?: () => string;
   getAccDescription?: () => string;
   bindFunctions?: (element: Element) => void;
+  getTasks ?: () => void;
 }
 
 export interface DiagramDefinition {

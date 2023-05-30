@@ -96,6 +96,8 @@ export interface RenderResult {
    * ```
    */
   bindFunctions?: (element: Element) => void;
+
+  taskArray: any;
 }
 
 /**
@@ -506,6 +508,8 @@ const render = async function (
   style1.innerHTML = rules;
   svg.insertBefore(style1, firstChild);
 
+  const taskArray = diag.db.getTasks ?.();
+
   // -------------------------------------------------------------------------------
   // Draw the diagram with the renderer
   try {
@@ -558,6 +562,7 @@ const render = async function (
 
   return {
     svg: svgCode,
+    taskArray: taskArray,
     bindFunctions: diag.db.bindFunctions,
   };
 };
