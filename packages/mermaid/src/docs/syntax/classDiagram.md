@@ -143,9 +143,9 @@ class BankAccount{
 
 #### Generic Types
 
-Members can be defined using generic types, such as `List<int>`, for fields, parameters, and return types by enclosing the type within `~` (**tilde**). **Nested** type declarations such as `List<List<int>>` are supported.
+Generics can be represented as part of a class definition, and for class members/return types. In order to denote an item as generic, you enclose that type within `~` (**tilde**). **Nested** type declarations such as `List<List<int>>` are supported, though generics that include a comma are currently not supported. (such as `List<List<K, V>>`)
 
-Generics can be represented as part of a class definition and also in the parameters or the return value of a method/function:
+> _note_ when a generic is used within a class definition, the generic type is NOT considered part of the class name. i.e.: for any syntax which required you to reference the class name, you need to drop the type part of the definition. This also means that mermaid does not currently support having two classes with the same name, but different generic types.
 
 ```mermaid-example
 classDiagram
@@ -248,7 +248,7 @@ classE o-- classF : aggregation
 
 Relations can logically represent an N:M association:
 
-```mmd
+```mermaid
 classDiagram
     Animal <|--|> Zebra
 ```
@@ -277,6 +277,21 @@ And `Link` can be one of:
 | --   | Solid       |
 | ..   | Dashed      |
 
+## Define Namespace
+
+A namespace groups classes.
+
+```mermaid-example
+classDiagram
+namespace BaseShapes {
+    class Triangle
+    class Rectangle {
+      double width
+      double height
+    }
+}
+```
+
 ## Cardinality / Multiplicity on relations
 
 Multiplicity or cardinality in class diagrams indicates the number of instances of one class that can be linked to an instance of the other class. For example, each company will have one or more employees (not zero), and each employee currently works for zero or one companies.
@@ -289,9 +304,9 @@ The different cardinality options are :
 - `0..1` Zero or One
 - `1..*` One or more
 - `*` Many
-- `n` n {where n>1}
-- `0..n` zero to n {where n>1}
-- `1..n` one to n {where n>1}
+- `n` n (where n>1)
+- `0..n` zero to n (where n>1)
+- `1..n` one to n (where n>1)
 
 Cardinality can be easily defined by placing the text option within quotes `"` before or after a given arrow. For example:
 
@@ -351,7 +366,7 @@ class Color{
 
 Comments can be entered within a class diagram, which will be ignored by the parser. Comments need to be on their own line, and must be prefaced with `%%` (double percent signs). Any text until the next newline will be treated as a comment, including any class diagram syntax.
 
-```mmd
+```mermaid
 classDiagram
 %% This whole line is a comment classDiagram class Shape <<interface>>
 class Shape{
@@ -417,7 +432,7 @@ classDiagram
 
 _URL Link:_
 
-```mmd
+```mermaid
 classDiagram
 class Shape
 link Shape "https://www.github.com" "This is a tooltip for a link"
@@ -427,7 +442,7 @@ click Shape2 href "https://www.github.com" "This is a tooltip for a link"
 
 _Callback:_
 
-```mmd
+```mermaid
 classDiagram
 class Shape
 callback Shape "callbackFunction" "This is a tooltip for a callback"
@@ -503,9 +518,22 @@ Beginner's tip—a full example using interactive links in an HTML page:
 
 ## Styling
 
-### Styling a node
+### Styling a node (v10.7.0+)
 
-It is possible to apply specific styles such as a thicker border or a different background color to individual nodes. This is done by predefining classes in css styles that can be applied from the graph definition using the `cssClass` statement or the `:::` short hand.
+It is possible to apply specific styles such as a thicker border or a different background color to an individual node using the `style` keyword.
+
+```mermaid-example
+classDiagram
+  class Animal
+  class Mineral
+  style Animal fill:#f9f,stroke:#333,stroke-width:4px
+  style Mineral fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+```
+
+#### Classes
+
+More convenient than defining the style every time is to define a class of styles and attach this class to the nodes that
+should have a different look. This is done by predefining classes in css styles that can be applied from the graph definition using the `cssClass` statement or the `:::` short hand.
 
 ```html
 <style>

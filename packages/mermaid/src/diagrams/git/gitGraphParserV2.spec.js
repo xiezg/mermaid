@@ -1,23 +1,12 @@
-/* eslint-env jasmine */
-// Todo reintroduce without cryptoRandomString
 import gitGraphAst from './gitGraphAst.js';
 import { parser } from './parser/gitGraph.jison';
-//import randomString from 'crypto-random-string';
-//import cryptoRandomString from 'crypto-random-string';
-
-//jest.mock('crypto-random-string');
 
 describe('when parsing a gitGraph', function () {
-  let randomNumber;
   beforeEach(function () {
     parser.yy = gitGraphAst;
     parser.yy.clear();
-    randomNumber = 0;
   });
-  // afterEach(function() {
-  //   cryptoRandomString.mockReset();
-  // });
-  it('should handle a gitGraph commit with NO pararms, get auto-genrated reandom ID', function () {
+  it('should handle a gitGraph commit with NO pararms, get auto-generated reandom ID', function () {
     const str = `gitGraph:
     commit
     `;
@@ -531,6 +520,78 @@ describe('when parsing a gitGraph', function () {
     ]);
   });
 
+  it('should handle new branch switch', function () {
+    const str = `gitGraph:
+    commit
+    branch testBranch
+    switch testBranch
+    `;
+
+    parser.parse(str);
+    const commits = parser.yy.getCommits();
+    expect(Object.keys(commits).length).toBe(1);
+    expect(parser.yy.getCurrentBranch()).toBe('testBranch');
+    expect(parser.yy.getDirection()).toBe('LR');
+    expect(Object.keys(parser.yy.getBranches()).length).toBe(2);
+  });
+
+  it('should handle new branch switch & commit', function () {
+    const str = `gitGraph:
+    commit
+    branch testBranch
+    switch testBranch
+    commit
+    `;
+
+    parser.parse(str);
+    const commits = parser.yy.getCommits();
+    expect(Object.keys(commits).length).toBe(2);
+    expect(parser.yy.getCurrentBranch()).toBe('testBranch');
+    expect(parser.yy.getDirection()).toBe('LR');
+    expect(Object.keys(parser.yy.getBranches()).length).toBe(2);
+    const commit1 = Object.keys(commits)[0];
+    const commit2 = Object.keys(commits)[1];
+    expect(commits[commit1].branch).toBe('main');
+    expect(commits[commit1].parents).toStrictEqual([]);
+    expect(commits[commit2].branch).toBe('testBranch');
+    expect(commits[commit2].parents).toStrictEqual([commit1]);
+  });
+
+  it('should handle new branch switch & commit and merge', function () {
+    const str = `gitGraph:
+    commit
+    branch testBranch
+    switch testBranch
+    commit
+    commit
+    switch main
+    merge testBranch
+    `;
+
+    parser.parse(str);
+    const commits = parser.yy.getCommits();
+    expect(Object.keys(commits).length).toBe(4);
+    expect(parser.yy.getCurrentBranch()).toBe('main');
+    expect(parser.yy.getDirection()).toBe('LR');
+    expect(Object.keys(parser.yy.getBranches()).length).toBe(2);
+    const commit1 = Object.keys(commits)[0];
+    const commit2 = Object.keys(commits)[1];
+    const commit3 = Object.keys(commits)[2];
+    const commit4 = Object.keys(commits)[3];
+    expect(commits[commit1].branch).toBe('main');
+    expect(commits[commit1].parents).toStrictEqual([]);
+    expect(commits[commit2].branch).toBe('testBranch');
+    expect(commits[commit2].parents).toStrictEqual([commits[commit1].id]);
+    expect(commits[commit3].branch).toBe('testBranch');
+    expect(commits[commit3].parents).toStrictEqual([commits[commit2].id]);
+    expect(commits[commit4].branch).toBe('main');
+    expect(commits[commit4].parents).toStrictEqual([commits[commit1].id, commits[commit3].id]);
+    expect(parser.yy.getBranchesAsObjArray()).toStrictEqual([
+      { name: 'main' },
+      { name: 'testBranch' },
+    ]);
+  });
+
   it('should handle merge tags', function () {
     const str = `gitGraph:
     commit
@@ -682,6 +743,145 @@ describe('when parsing a gitGraph', function () {
     const cherryPickCommitID = Object.keys(commits)[2];
     expect(commits[cherryPickCommitID].tag).toBe('');
     expect(commits[cherryPickCommitID].branch).toBe('main');
+  });
+
+  it('should support cherry-picking of merge commits', function () {
+    const str = `gitGraph
+    commit id: "ZERO"
+    branch feature
+    branch release
+    checkout feature
+    commit id: "A"
+    commit id: "B"
+    checkout main
+    merge feature id: "M"
+    checkout release
+    cherry-pick id: "M" parent:"B"
+    `;
+
+    parser.parse(str);
+    const commits = parser.yy.getCommits();
+    const cherryPickCommitID = Object.keys(commits)[4];
+    expect(commits[cherryPickCommitID].tag).toBe('cherry-pick:M|parent:B');
+    expect(commits[cherryPickCommitID].branch).toBe('release');
+  });
+
+  it('should support cherry-picking of merge commits with tag', function () {
+    const str = `gitGraph
+    commit id: "ZERO"
+    branch feature
+    branch release
+    checkout feature
+    commit id: "A"
+    commit id: "B"
+    checkout main
+    merge feature id: "M"
+    checkout release
+    cherry-pick id: "M" parent:"ZERO" tag: "v1.0"
+    `;
+
+    parser.parse(str);
+    const commits = parser.yy.getCommits();
+    const cherryPickCommitID = Object.keys(commits)[4];
+    expect(commits[cherryPickCommitID].tag).toBe('v1.0');
+    expect(commits[cherryPickCommitID].branch).toBe('release');
+  });
+
+  it('should support cherry-picking of merge commits with additional commit', function () {
+    const str = `gitGraph
+    commit id: "ZERO"
+    branch feature
+    branch release
+    checkout feature
+    commit id: "A"
+    commit id: "B"
+    checkout main
+    merge feature id: "M"
+    checkout release
+    commit id: "C"
+    cherry-pick id: "M" tag: "v2.1:ZERO" parent:"ZERO"
+    commit id: "D"
+    `;
+
+    parser.parse(str);
+    const commits = parser.yy.getCommits();
+    const cherryPickCommitID = Object.keys(commits)[5];
+    expect(commits[cherryPickCommitID].tag).toBe('v2.1:ZERO');
+    expect(commits[cherryPickCommitID].branch).toBe('release');
+  });
+
+  it('should support cherry-picking of merge commits with empty tag', function () {
+    const str = `gitGraph
+    commit id: "ZERO"
+    branch feature
+    branch release
+    checkout feature
+    commit id: "A"
+    commit id: "B"
+    checkout main
+    merge feature id: "M"
+    checkout release
+    commit id: "C"
+    cherry-pick id:"M" parent: "ZERO" tag:""
+    commit id: "D"
+    cherry-pick id:"M" tag:"" parent: "B"
+    `;
+
+    parser.parse(str);
+    const commits = parser.yy.getCommits();
+    const cherryPickCommitID = Object.keys(commits)[5];
+    const cherryPickCommitID2 = Object.keys(commits)[7];
+    expect(commits[cherryPickCommitID].tag).toBe('');
+    expect(commits[cherryPickCommitID2].tag).toBe('');
+    expect(commits[cherryPickCommitID].branch).toBe('release');
+  });
+
+  it('should fail cherry-picking of merge commits if the parent of merge commits is not specified', function () {
+    expect(() =>
+      parser
+        .parse(
+          `gitGraph
+    commit id: "ZERO"
+    branch feature
+    branch release
+    checkout feature
+    commit id: "A"
+    commit id: "B"
+    checkout main
+    merge feature id: "M"
+    checkout release
+    commit id: "C"
+    cherry-pick id:"M"
+    `
+        )
+        .toThrow(
+          'Incorrect usage of cherry-pick: If the source commit is a merge commit, an immediate parent commit must be specified.'
+        )
+    );
+  });
+
+  it('should fail cherry-picking of merge commits when the parent provided is not an immediate parent of cherry picked commit', function () {
+    expect(() =>
+      parser
+        .parse(
+          `gitGraph
+    commit id: "ZERO"
+    branch feature
+    branch release
+    checkout feature
+    commit id: "A"
+    commit id: "B"
+    checkout main
+    merge feature id: "M"
+    checkout release
+    commit id: "C"
+    cherry-pick id:"M" parent: "A"
+    `
+        )
+        .toThrow(
+          'Invalid operation: The specified parent commit is not an immediate parent of the cherry-picked commit.'
+        )
+    );
   });
 
   it('should throw error when try to branch existing branch: main', function () {

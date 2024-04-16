@@ -1,6 +1,6 @@
 /// <reference types="Cypress" />
 
-import { imgSnapshotTest, renderGraph } from '../../helpers/util.js';
+import { imgSnapshotTest, renderGraph } from '../../helpers/util.ts';
 
 context('Sequence diagram', () => {
   it('should render a sequence diagram with boxes', () => {
@@ -88,6 +88,16 @@ context('Sequence diagram', () => {
       {}
     );
   });
+  it('should handle empty lines', () => {
+    imgSnapshotTest(
+      `
+      sequenceDiagram
+      Alice->>John: Hello John<br/>
+      John-->>Alice: Great<br/><br/>day!
+    `,
+      {}
+    );
+  });
   it('should handle line breaks and wrap annotations', () => {
     imgSnapshotTest(
       `
@@ -121,6 +131,104 @@ context('Sequence diagram', () => {
           wrap: true,
         },
       }
+    );
+  });
+  it('should render a sequence diagram with par_over', () => {
+    imgSnapshotTest(
+      `
+        sequenceDiagram
+        participant Alice
+        participant Bob
+        participant John
+        par_over Section title
+          Alice ->> Bob: Message 1<br>Second line
+          Bob ->> John: Message 2
+        end
+        par_over Two line<br>section title
+          Note over Alice: Alice note
+          Note over Bob: Bob note<br>Second line
+          Note over John: John note
+        end
+        par_over Mixed section
+          Alice ->> Bob: Message 1
+          Note left of Bob: Alice/Bob Note
+        end
+      `
+    );
+  });
+  it('should render a sequence diagram with basic actor creation and destruction', () => {
+    imgSnapshotTest(
+      `
+      sequenceDiagram
+      Alice ->> Bob: Hello Bob, how are you ?
+      Bob ->> Alice: Fine, thank you. And you?
+      create participant Polo
+      Alice ->> Polo: Hi Polo!
+      create actor Ola1 as Ola
+      Polo ->> Ola1: Hiii
+      Ola1 ->> Alice: Hi too
+      destroy Ola1
+      Alice --x Ola1: Bye!
+      Alice ->> Bob: And now?
+      create participant Ola2 as Ola
+      Alice ->> Ola2: Hello again
+      destroy Alice
+      Alice --x Ola2: Bye for me!
+      destroy Bob
+      Ola2 --> Bob: The end
+      `
+    );
+  });
+  it('should render a sequence diagram with actor creation and destruction coupled with backgrounds, loops and notes', () => {
+    imgSnapshotTest(
+      `
+      sequenceDiagram
+			accTitle: test the accTitle
+			accDescr: Test a description
+
+			participant Alice
+      participant Bob
+			autonumber 10 10
+			rect rgb(200, 220, 100)
+			rect rgb(200, 255, 200)
+
+			Alice ->> Bob: Hello Bob, how are you?
+      create participant John as John<br />Second Line
+			Bob-->>John: How about you John?
+			end
+
+			Bob--x Alice: I am good thanks!
+			Bob-x John: I am good thanks!
+			Note right of John: John thinks a long<br />long time, so long<br />that the text does<br />not fit on a row.
+
+			Bob-->Alice: Checking with John...
+			Note over John:wrap: John looks like he's still thinking, so Bob prods him a bit.
+			Bob-x John: Hey John - we're still waiting to know<br />how you're doing
+			Note over John:nowrap: John's trying hard not to break his train of thought.
+      destroy John
+			Bob-x John: John! Cmon!
+			Note over John: After a few more moments, John<br />finally snaps out of it.
+			end
+
+			autonumber off
+			alt either this
+      create actor Lola
+			Alice->>+Lola: Yes
+			Lola-->>-Alice: OK
+			else or this
+			autonumber
+			Alice->>Lola: No
+			else or this will happen
+			Alice->Lola: Maybe
+			end
+			autonumber 200
+			par this happens in parallel
+      destroy Bob
+			Alice -->> Bob: Parallel message 1
+			and
+			Alice -->> Lola: Parallel message 2
+			end
+      `
     );
   });
   context('font settings', () => {
@@ -266,6 +374,29 @@ context('Sequence diagram', () => {
       `,
         {}
       );
+    });
+    it('should have actor-top and actor-bottom classes on top and bottom actor box and symbol and actor-box and actor-man classes for text tags', () => {
+      imgSnapshotTest(
+        `
+        sequenceDiagram
+          actor Bob
+          Alice->>Bob: Hi Bob
+          Bob->>Alice: Hi Alice
+      `,
+        {}
+      );
+      cy.get('.actor').should('have.class', 'actor-top');
+      cy.get('.actor-man').should('have.class', 'actor-top');
+      cy.get('.actor.actor-top').should('not.have.class', 'actor-bottom');
+      cy.get('.actor-man.actor-top').should('not.have.class', 'actor-bottom');
+
+      cy.get('.actor').should('have.class', 'actor-bottom');
+      cy.get('.actor-man').should('have.class', 'actor-bottom');
+      cy.get('.actor.actor-bottom').should('not.have.class', 'actor-top');
+      cy.get('.actor-man.actor-bottom').should('not.have.class', 'actor-top');
+
+      cy.get('text.actor-box').should('include.text', 'Alice');
+      cy.get('text.actor-man').should('include.text', 'Bob');
     });
     it('should render long notes left of actor', () => {
       imgSnapshotTest(
@@ -679,11 +810,42 @@ context('Sequence diagram', () => {
         note left of Alice: config: mirrorActors=true<br/>directive: mirrorActors=false
         Bob->>Alice: Short as well
       `,
-        { logLevel: 0, sequence: { mirrorActors: true, noteFontSize: 18, noteFontFamily: 'Arial' } }
+        {
+          logLevel: 0,
+          sequence: { mirrorActors: true, noteFontSize: 18, noteFontFamily: 'Arial' },
+        }
       );
     });
   });
   context('links', () => {
+    it('should support actor links', () => {
+      renderGraph(
+        `
+      sequenceDiagram
+        link Alice: Dashboard @ https://dashboard.contoso.com/alice
+        link Alice: Wiki @ https://wiki.contoso.com/alice
+        link John: Dashboard @ https://dashboard.contoso.com/john
+        link John: Wiki @ https://wiki.contoso.com/john
+        Alice->>John: Hello John<br/>
+        John-->>Alice: Great<br/><br/>day!
+      `,
+        { securityLevel: 'loose' }
+      );
+      cy.get('#actor0_popup').should((popupMenu) => {
+        const style = popupMenu.attr('style');
+        expect(style).to.undefined;
+      });
+      cy.get('#root-0').click();
+      cy.get('#actor0_popup').should((popupMenu) => {
+        const style = popupMenu.attr('style');
+        expect(style).to.match(/^display: block;$/);
+      });
+      cy.get('#root-0').click();
+      cy.get('#actor0_popup').should((popupMenu) => {
+        const style = popupMenu.attr('style');
+        expect(style).to.match(/^display: none;$/);
+      });
+    });
     it('should support actor links and properties EXPERIMENTAL: USE WITH CAUTION', () => {
       //Be aware that the syntax for "properties" is likely to be changed.
       imgSnapshotTest(
@@ -702,7 +864,10 @@ context('Sequence diagram', () => {
         a->>j: Hello John, how are you?
         j-->>a: Great!
       `,
-        { logLevel: 0, sequence: { mirrorActors: true, noteFontSize: 18, noteFontFamily: 'Arial' } }
+        {
+          logLevel: 0,
+          sequence: { mirrorActors: true, noteFontSize: 18, noteFontFamily: 'Arial' },
+        }
       );
     });
     it('should support actor links and properties when not mirrored EXPERIMENTAL: USE WITH CAUTION', () => {
@@ -820,6 +985,38 @@ context('Sequence diagram', () => {
         expect(width).to.be.within(820 * 0.95, 820 * 1.05);
         expect(svg).to.not.have.attr('style');
       });
+    });
+  });
+  context('render after error', () => {
+    it('should render diagram after fixing destroy participant error', () => {
+      cy.on('uncaught:exception', (err) => {
+        return false;
+      });
+
+      renderGraph([
+        `sequenceDiagram
+    Alice->>Bob: Hello Bob, how are you ?
+    Bob->>Alice: Fine, thank you. And you?
+    create participant Carl
+    Alice->>Carl: Hi Carl!
+    create actor D as Donald
+    Carl->>D: Hi!
+    destroy Carl
+    Alice-xCarl: We are too many
+    destroy Bo
+    Bob->>Alice: I agree`,
+        `sequenceDiagram
+    Alice->>Bob: Hello Bob, how are you ?
+    Bob->>Alice: Fine, thank you. And you?
+    create participant Carl
+    Alice->>Carl: Hi Carl!
+    create actor D as Donald
+    Carl->>D: Hi!
+    destroy Carl
+    Alice-xCarl: We are too many
+    destroy Bob
+    Bob->>Alice: I agree`,
+      ]);
     });
   });
 });

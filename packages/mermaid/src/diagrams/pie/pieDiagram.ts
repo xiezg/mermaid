@@ -1,9 +1,8 @@
-import { DiagramDefinition } from '../../diagram-api/types.js';
-// @ts-ignore: TODO Fix ts errors
-import parser from './parser/pie.jison';
-import db from './pieDb.js';
-import styles from './styles.js';
-import renderer from './pieRenderer.js';
+import type { DiagramDefinition } from '../../diagram-api/types.js';
+import { parser } from './pieParser.js';
+import { db } from './pieDb.js';
+import styles from './pieStyles.js';
+import { renderer } from './pieRenderer.js';
 
 export const diagram: DiagramDefinition = {
   parser,

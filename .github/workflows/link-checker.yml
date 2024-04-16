@@ -20,29 +20,26 @@ on:
     - cron: '30 8 * * *'
 
 jobs:
-  linkChecker:
+  link-checker:
     runs-on: ubuntu-latest
     permissions:
       # lychee only uses the GITHUB_TOKEN to avoid rate-limiting
       contents: read
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Restore lychee cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: .lycheecache
           key: cache-lychee-${{ github.sha }}
           restore-keys: cache-lychee-
 
       - name: Link Checker
-        uses: lycheeverse/lychee-action@v1.7.0
+        uses: lycheeverse/lychee-action@v1.9.3
         with:
           args: >-
-            --verbose
-            --no-progress
-            --cache
-            --max-cache-age 1d
+            --config .github/lychee.toml
             packages/mermaid/src/docs/**/*.md
             README.md
             README.zh-CN.md

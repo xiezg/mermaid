@@ -1,4 +1,4 @@
-import { invert, darken, lighten, adjust } from 'khroma';
+import { invert, darken, lighten, adjust, isDark } from 'khroma';
 import { mkBorder } from './theme-helpers.js';
 import {
   oldAttributeBackgroundColorEven,
@@ -58,7 +58,7 @@ class Theme {
     this.actorBorder = 'calculated';
     this.actorBkg = 'calculated';
     this.actorTextColor = 'calculated';
-    this.actorLineColor = 'calculated';
+    this.actorLineColor = this.actorBorder;
     this.signalColor = 'calculated';
     this.signalTextColor = 'calculated';
     this.labelBoxBkgColor = 'calculated';
@@ -113,7 +113,7 @@ class Theme {
     this.actorBorder = lighten(this.border1, 23);
     this.actorBkg = this.mainBkg;
     this.actorTextColor = this.text;
-    this.actorLineColor = this.lineColor;
+    this.actorLineColor = this.actorBorder;
     this.signalColor = this.text;
     this.signalTextColor = this.text;
     this.labelBoxBkgColor = this.actorBkg;
@@ -245,6 +245,48 @@ class Theme {
     this.pieOuterStrokeWidth = this.pieOuterStrokeWidth || '2px';
     this.pieOuterStrokeColor = this.pieOuterStrokeColor || 'black';
     this.pieOpacity = this.pieOpacity || '0.7';
+
+    /* quadrant-graph */
+    this.quadrant1Fill = this.quadrant1Fill || this.primaryColor;
+    this.quadrant2Fill = this.quadrant2Fill || adjust(this.primaryColor, { r: 5, g: 5, b: 5 });
+    this.quadrant3Fill = this.quadrant3Fill || adjust(this.primaryColor, { r: 10, g: 10, b: 10 });
+    this.quadrant4Fill = this.quadrant4Fill || adjust(this.primaryColor, { r: 15, g: 15, b: 15 });
+    this.quadrant1TextFill = this.quadrant1TextFill || this.primaryTextColor;
+    this.quadrant2TextFill =
+      this.quadrant2TextFill || adjust(this.primaryTextColor, { r: -5, g: -5, b: -5 });
+    this.quadrant3TextFill =
+      this.quadrant3TextFill || adjust(this.primaryTextColor, { r: -10, g: -10, b: -10 });
+    this.quadrant4TextFill =
+      this.quadrant4TextFill || adjust(this.primaryTextColor, { r: -15, g: -15, b: -15 });
+    this.quadrantPointFill =
+      this.quadrantPointFill || isDark(this.quadrant1Fill)
+        ? lighten(this.quadrant1Fill)
+        : darken(this.quadrant1Fill);
+    this.quadrantPointTextFill = this.quadrantPointTextFill || this.primaryTextColor;
+    this.quadrantXAxisTextFill = this.quadrantXAxisTextFill || this.primaryTextColor;
+    this.quadrantYAxisTextFill = this.quadrantYAxisTextFill || this.primaryTextColor;
+    this.quadrantInternalBorderStrokeFill =
+      this.quadrantInternalBorderStrokeFill || this.primaryBorderColor;
+    this.quadrantExternalBorderStrokeFill =
+      this.quadrantExternalBorderStrokeFill || this.primaryBorderColor;
+    this.quadrantTitleFill = this.quadrantTitleFill || this.primaryTextColor;
+
+    /* xychart */
+    this.xyChart = {
+      backgroundColor: this.xyChart?.backgroundColor || this.background,
+      titleColor: this.xyChart?.titleColor || this.primaryTextColor,
+      xAxisTitleColor: this.xyChart?.xAxisTitleColor || this.primaryTextColor,
+      xAxisLabelColor: this.xyChart?.xAxisLabelColor || this.primaryTextColor,
+      xAxisTickColor: this.xyChart?.xAxisTickColor || this.primaryTextColor,
+      xAxisLineColor: this.xyChart?.xAxisLineColor || this.primaryTextColor,
+      yAxisTitleColor: this.xyChart?.yAxisTitleColor || this.primaryTextColor,
+      yAxisLabelColor: this.xyChart?.yAxisLabelColor || this.primaryTextColor,
+      yAxisTickColor: this.xyChart?.yAxisTickColor || this.primaryTextColor,
+      yAxisLineColor: this.xyChart?.yAxisLineColor || this.primaryTextColor,
+      plotColorPalette:
+        this.xyChart?.plotColorPalette ||
+        '#EEE,#6BB8E4,#8ACB88,#C7ACD6,#E8DCC2,#FFB2A8,#FFF380,#7E8D91,#FFD8B1,#FAF3E0',
+    };
 
     /* requirement-diagram */
     this.requirementBackground = this.requirementBackground || this.primaryColor;

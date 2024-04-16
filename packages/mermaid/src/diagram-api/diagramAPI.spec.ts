@@ -1,13 +1,13 @@
 import { detectType } from './detectType.js';
 import { getDiagram, registerDiagram } from './diagramAPI.js';
 import { addDiagrams } from './diagram-orchestration.js';
-import { DiagramDetector } from './types.js';
-import { getDiagramFromText } from '../Diagram.js';
+import type { DiagramDetector } from './types.js';
+import { Diagram } from '../Diagram.js';
 import { it, describe, expect, beforeAll } from 'vitest';
 
 addDiagrams();
 beforeAll(async () => {
-  await getDiagramFromText('sequenceDiagram');
+  await Diagram.fromText('sequenceDiagram');
 });
 
 describe('DiagramAPI', () => {
@@ -17,16 +17,16 @@ describe('DiagramAPI', () => {
 
   it('should throw error if diagram is not defined', () => {
     expect(() => getDiagram('loki')).toThrowErrorMatchingInlineSnapshot(
-      '"Diagram loki not found."'
+      `[Error: Diagram loki not found.]`
     );
   });
 
   it('should handle diagram registrations', () => {
     expect(() => getDiagram('loki')).toThrowErrorMatchingInlineSnapshot(
-      '"Diagram loki not found."'
+      `[Error: Diagram loki not found.]`
     );
     expect(() => detectType('loki diagram')).toThrowErrorMatchingInlineSnapshot(
-      '"No diagram type detected matching given configuration for text: loki diagram"'
+      `[UnknownDiagramError: No diagram type detected matching given configuration for text: loki diagram]`
     );
     const detector: DiagramDetector = (str: string) => {
       return str.match('loki') !== null;
@@ -35,8 +35,16 @@ describe('DiagramAPI', () => {
       'loki',
       {
         db: {},
-        parser: {},
-        renderer: {},
+        parser: {
+          parse: (_text) => {
+            return;
+          },
+        },
+        renderer: {
+          draw: () => {
+            // no-op
+          },
+        },
         styles: {},
       },
       detector

@@ -1,10 +1,9 @@
-// @ts-expect-error - d3 types issue
-import { select, Selection } from 'd3';
+import type { Selection } from 'd3';
+import { select } from 'd3';
 import { log } from '../../logger.js';
-import * as configApi from '../../config.js';
+import { getConfig } from '../../diagram-api/diagramAPI.js';
 import common from '../common/common.js';
 import utils from '../../utils.js';
-import mermaidAPI from '../../mermaidAPI.js';
 import {
   setAccTitle,
   getAccTitle,
@@ -13,8 +12,16 @@ import {
   clear as commonClear,
   setDiagramTitle,
   getDiagramTitle,
-} from '../../commonDb.js';
-import { ClassRelation, ClassNode, ClassNote, ClassMap } from './classTypes.js';
+} from '../common/commonDb.js';
+import { ClassMember } from './classTypes.js';
+import type {
+  ClassRelation,
+  ClassNode,
+  ClassNote,
+  ClassMap,
+  NamespaceMap,
+  NamespaceNode,
+} from './classTypes.js';
 
 const MERMAID_DOM_ID_PREFIX = 'classId-';
 
@@ -22,17 +29,15 @@ let relations: ClassRelation[] = [];
 let classes: ClassMap = {};
 let notes: ClassNote[] = [];
 let classCounter = 0;
+let namespaces: NamespaceMap = {};
+let namespaceCounter = 0;
 
 let functions: any[] = [];
 
-const sanitizeText = (txt: string) => common.sanitizeText(txt, configApi.getConfig());
+const sanitizeText = (txt: string) => common.sanitizeText(txt, getConfig());
 
-export const parseDirective = function (statement: string, context: string, type: string) {
-  // @ts-ignore Don't wanna mess it up
-  mermaidAPI.parseDirective(this, statement, context, type);
-};
-
-const splitClassNameAndType = function (id: string) {
+const splitClassNameAndType = function (_id: string) {
+  const id = common.sanitizeText(_id, getConfig());
   let genericType = '';
   let className = id;
 
@@ -45,7 +50,8 @@ const splitClassNameAndType = function (id: string) {
   return { className: className, type: genericType };
 };
 
-export const setClassLabel = function (id: string, label: string) {
+export const setClassLabel = function (_id: string, label: string) {
+  const id = common.sanitizeText(_id, getConfig());
   if (label) {
     label = sanitizeText(label);
   }
@@ -60,22 +66,26 @@ export const setClassLabel = function (id: string, label: string) {
  * @param id - Id of the class to add
  * @public
  */
-export const addClass = function (id: string) {
-  const classId = splitClassNameAndType(id);
+export const addClass = function (_id: string) {
+  const id = common.sanitizeText(_id, getConfig());
+  const { className, type } = splitClassNameAndType(id);
   // Only add class if not exists
-  if (classes[classId.className] !== undefined) {
+  if (Object.hasOwn(classes, className)) {
     return;
   }
-
-  classes[classId.className] = {
-    id: classId.className,
-    type: classId.type,
-    label: classId.className,
+  // alert('Adding class: ' + className);
+  const name = common.sanitizeText(className, getConfig());
+  // alert('Adding class after: ' + name);
+  classes[name] = {
+    id: name,
+    type: type,
+    label: name,
     cssClasses: [],
     methods: [],
     members: [],
     annotations: [],
-    domId: MERMAID_DOM_ID_PREFIX + classId.className + '-' + classCounter,
+    styles: [],
+    domId: MERMAID_DOM_ID_PREFIX + name + '-' + classCounter,
   } as ClassNode;
 
   classCounter++;
@@ -87,7 +97,8 @@ export const addClass = function (id: string) {
  * @param id - class ID to lookup
  * @public
  */
-export const lookUpDomId = function (id: string): string {
+export const lookUpDomId = function (_id: string): string {
+  const id = common.sanitizeText(_id, getConfig());
   if (id in classes) {
     return classes[id].domId;
   }
@@ -100,14 +111,16 @@ export const clear = function () {
   notes = [];
   functions = [];
   functions.push(setupToolTips);
+  namespaces = {};
+  namespaceCounter = 0;
   commonClear();
 };
 
-export const getClass = function (id: string) {
+export const getClass = function (id: string): ClassNode {
   return classes[id];
 };
 
-export const getClasses = function () {
+export const getClasses = function (): ClassMap {
   return classes;
 };
 
@@ -127,15 +140,9 @@ export const addRelation = function (relation: ClassRelation) {
   relation.id1 = splitClassNameAndType(relation.id1).className;
   relation.id2 = splitClassNameAndType(relation.id2).className;
 
-  relation.relationTitle1 = common.sanitizeText(
-    relation.relationTitle1.trim(),
-    configApi.getConfig()
-  );
+  relation.relationTitle1 = common.sanitizeText(relation.relationTitle1.trim(), getConfig());
 
-  relation.relationTitle2 = common.sanitizeText(
-    relation.relationTitle2.trim(),
-    configApi.getConfig()
-  );
+  relation.relationTitle2 = common.sanitizeText(relation.relationTitle2.trim(), getConfig());
 
   relations.push(relation);
 };
@@ -163,6 +170,8 @@ export const addAnnotation = function (className: string, annotation: string) {
  * @public
  */
 export const addMember = function (className: string, member: string) {
+  addClass(className);
+
   const validatedClassName = splitClassNameAndType(className).className;
   const theClass = classes[validatedClassName];
 
@@ -175,9 +184,9 @@ export const addMember = function (className: string, member: string) {
       theClass.annotations.push(sanitizeText(memberString.substring(2, memberString.length - 2)));
     } else if (memberString.indexOf(')') > 0) {
       //its a method
-      theClass.methods.push(sanitizeText(memberString));
+      theClass.methods.push(new ClassMember(memberString, 'method'));
     } else if (memberString) {
-      theClass.members.push(sanitizeText(memberString));
+      theClass.members.push(new ClassMember(memberString, 'attribute'));
     }
   }
 };
@@ -206,7 +215,7 @@ export const cleanupLabel = function (label: string) {
 };
 
 /**
- * Called by parser when a special node is found, e.g. a clickable element.
+ * Called by parser when assigning cssClass to a class
  *
  * @param ids - Comma separated list of ids
  * @param className - Class to add
@@ -237,9 +246,14 @@ const setTooltip = function (ids: string, tooltip?: string) {
   });
 };
 
-export const getTooltip = function (id: string) {
+export const getTooltip = function (id: string, namespace?: string) {
+  if (namespace) {
+    return namespaces[namespace].classes[id].tooltip;
+  }
+
   return classes[id].tooltip;
 };
+
 /**
  * Called by parser when a link is found. Adds the URL to the vertex data.
  *
@@ -248,7 +262,7 @@ export const getTooltip = function (id: string) {
  * @param target - Target of the link, _blank by default as originally defined in the svgDraw.js file
  */
 export const setLink = function (ids: string, linkStr: string, target: string) {
-  const config = configApi.getConfig();
+  const config = getConfig();
   ids.split(',').forEach(function (_id) {
     let id = _id;
     if (_id[0].match(/\d/)) {
@@ -283,8 +297,9 @@ export const setClickEvent = function (ids: string, functionName: string, functi
   setCssClass(ids, 'clickable');
 };
 
-const setClickFunc = function (domId: string, functionName: string, functionArgs: string) {
-  const config = configApi.getConfig();
+const setClickFunc = function (_domId: string, functionName: string, functionArgs: string) {
+  const domId = common.sanitizeText(_domId, getConfig());
+  const config = getConfig();
   if (config.securityLevel !== 'loose') {
     return;
   }
@@ -352,7 +367,7 @@ export const relationType = {
 const setupToolTips = function (element: Element) {
   let tooltipElem: Selection<HTMLDivElement, unknown, HTMLElement, unknown> =
     select('.mermaidTooltip');
-  // @ts-ignore - _groups is a dynamic property
+  // @ts-expect-error - Incorrect types
   if ((tooltipElem._groups || tooltipElem)[0][0] === null) {
     tooltipElem = select('body').append('div').attr('class', 'mermaidTooltip').style('opacity', 0);
   }
@@ -362,7 +377,6 @@ const setupToolTips = function (element: Element) {
   const nodes = svg.selectAll('g.node');
   nodes
     .on('mouseover', function () {
-      // @ts-expect-error - select is not part of the d3 type definition
       const el = select(this);
       const title = el.attr('title');
       // Don't try to draw a tooltip if no data is provided
@@ -372,6 +386,7 @@ const setupToolTips = function (element: Element) {
       // @ts-ignore - getBoundingClientRect is not part of the d3 type definition
       const rect = this.getBoundingClientRect();
 
+      // @ts-expect-error - Incorrect types
       tooltipElem.transition().duration(200).style('opacity', '.9');
       tooltipElem
         .text(el.attr('title'))
@@ -381,8 +396,8 @@ const setupToolTips = function (element: Element) {
       el.classed('hover', true);
     })
     .on('mouseout', function () {
+      // @ts-expect-error - Incorrect types
       tooltipElem.transition().duration(500).style('opacity', 0);
-      // @ts-expect-error - select is not part of the d3 type definition
       const el = select(this);
       el.classed('hover', false);
     });
@@ -395,13 +410,73 @@ const setDirection = (dir: string) => {
   direction = dir;
 };
 
+/**
+ * Function called by parser when a namespace definition has been found.
+ *
+ * @param id - Id of the namespace to add
+ * @public
+ */
+export const addNamespace = function (id: string) {
+  if (namespaces[id] !== undefined) {
+    return;
+  }
+
+  namespaces[id] = {
+    id: id,
+    classes: {},
+    children: {},
+    domId: MERMAID_DOM_ID_PREFIX + id + '-' + namespaceCounter,
+  } as NamespaceNode;
+
+  namespaceCounter++;
+};
+
+const getNamespace = function (name: string): NamespaceNode {
+  return namespaces[name];
+};
+
+const getNamespaces = function (): NamespaceMap {
+  return namespaces;
+};
+
+/**
+ * Function called by parser when a namespace definition has been found.
+ *
+ * @param id - Id of the namespace to add
+ * @param classNames - Ids of the class to add
+ * @public
+ */
+export const addClassesToNamespace = function (id: string, classNames: string[]) {
+  if (namespaces[id] === undefined) {
+    return;
+  }
+  for (const name of classNames) {
+    const { className } = splitClassNameAndType(name);
+    classes[className].parent = id;
+    namespaces[id].classes[className] = classes[className];
+  }
+};
+
+export const setCssStyle = function (id: string, styles: string[]) {
+  const thisClass = classes[id];
+  if (!styles || !thisClass) {
+    return;
+  }
+  for (const s of styles) {
+    if (s.includes(',')) {
+      thisClass.styles.push(...s.split(','));
+    } else {
+      thisClass.styles.push(s);
+    }
+  }
+};
+
 export default {
-  parseDirective,
   setAccTitle,
   getAccTitle,
   getAccDescription,
   setAccDescription,
-  getConfig: () => configApi.getConfig().class,
+  getConfig: () => getConfig().class,
   addClass,
   bindFunctions,
   clear,
@@ -428,4 +503,9 @@ export default {
   setDiagramTitle,
   getDiagramTitle,
   setClassLabel,
+  addNamespace,
+  addClassesToNamespace,
+  getNamespace,
+  getNamespaces,
+  setCssStyle,
 };
